@@ -139,7 +139,11 @@ labels = [
 features = df[columns].values
 labels = df[labels].values
 learners = {
-    'Random Forest': RandomForestRegressor(),
+    'Random Forest': RandomForestRegressor(
+        n_estimators=250,
+        n_jobs=-1,
+        max_features="auto",
+    ),
     'Decision Tree': DecisionTreeRegressor()
 }
 
