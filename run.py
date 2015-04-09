@@ -21,6 +21,13 @@ from sklearn.ensemble import (
 )
 from sklearn.tree import DecisionTreeRegressor
 
+def prudsys_score(estimator, X, y):
+
+    prediction = estimator.predict(X)
+    score = np.sum(((prediction - y)/np.mean(y, axis=0))**2)
+
+    return score
+
 
 matplotlib.style.use('ggplot')
 
@@ -153,7 +160,7 @@ def score2ufloat(score):
 
 x_train, x_test, y_train, y_test = train_test_split(features, labels, test_size=0.33)
 for name, learner in learners.iteritems():
-    score = cross_val_score(learner, features, labels, n_jobs=-1)
+    score = cross_val_score(learner, features, labels, scoring=prudsys_score, n_jobs=-1)
 
     learner.fit(x_train, y_train)
     rek_basket = learner.predict(x_test)
