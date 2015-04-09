@@ -43,6 +43,9 @@ df['orderTime_minutes'] = df.orderTime.dt.hour * 60 + df.orderTime.dt.minute
 df['couponsReceived_minutes'] = (df.couponsReceived.dt.hour * 60 +
                                  df.couponsReceived.dt.minute)
 df['sameDay'] = df.orderTime.dt.dayofyear == df.couponsReceived.dt.dayofyear
+
+df['priceSum'] = df['price1'] + df['price2'] + df['price3']
+
 # Brands
 brands = reduce(
     lambda acc, x: acc.union(set(df['brand{}'.format(x)])),
