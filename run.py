@@ -12,7 +12,10 @@ import sklearn as skl
 import uncertainties as u
 import uncertainties.unumpy as unp
 
-from sklearn.cross_validation import cross_val_score
+from sklearn.cross_validation import (
+    cross_val_score,
+    train_test_split,
+)
 from sklearn.ensemble import (
     RandomForestRegressor
 )
@@ -121,23 +124,41 @@ columns = [
     'orderTime_weekday',
     'couponsReceived_minutes',
     'couponsReceived_weekday',
-    'sameDay'
+    'sameDay',
+    'priceSum',
 ]
-columns.extend([b for b in df.columns
-                if 'brand' in b and b not in ('brand1', 'brand2', 'brand3')])
-labels = ['coupon1Used', 'coupon2Used', 'coupon3Used', 'basketValue']
+# columns.extend([b for b in df.columns
+#                 if 'brand' in b and b not in ('brand1', 'brand2', 'brand3')])
+labels = [
+    'coupon1Used',
+    'coupon2Used',
+    'coupon3Used',
+    'basketValue',
+]
 
-X = df[columns].values
-Y = df[labels].values
+features = df[columns].values
+labels = df[labels].values
 learners = {
     'Random Forest': RandomForestRegressor(),
     'Decision Tree': DecisionTreeRegressor()
 }
 
-
 def score2ufloat(score):
     return u.ufloat(score.mean(), score.std())
 
-for name, l in learners.iteritems():
-    score = cross_val_score(l, X, Y, n_jobs=-1)
+
+x_train, x_test, y_train, y_test = train_test_split(features, labels, test_size=0.33)
+for name, learner in learners.iteritems():
+    score = cross_val_score(learner, features, labels, n_jobs=-1)
+
+    learner.fit(x_train, y_train)
+    rek_basket = learner.predict(x_test)
+
+    plt.hist2d(np.log10(rek_basket[:,3]), np.log10(y_test[:,3]), 100, cmap="hot")
+    plt.xlabel("log10(estimated basketValue)")
+    plt.ylabel("log10(true basketValue)")
+    plt.colorbar()
+    plt.show()
+
+
     print("{}: {:P}".format(name, score2ufloat(score)))
