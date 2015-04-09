@@ -13,7 +13,10 @@ import uncertainties as u
 import uncertainties.unumpy as unp
 
 from sklearn.cross_validation import cross_val_score
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import (
+    RandomForestRegressor
+)
+from sklearn.tree import DecisionTreeRegressor
 
 
 matplotlib.style.use('ggplot')
@@ -117,21 +120,21 @@ columns = [
     'couponsReceived_weekday',
     'sameDay'
 ]
-labels = ['coupon1Used']
+columns.extend([b for b in df.columns
+                if 'brand' in b and b not in ('brand1', 'brand2', 'brand3')])
+labels = ['coupon1Used', 'coupon2Used', 'coupon3Used', 'basketValue']
 
 X = df[columns].values
 Y = df[labels].values
-classifiers = {
-    'Random Forest': RandomForestClassifier()
+learners = {
+    'Random Forest': RandomForestRegressor(),
+    'Decision Tree': DecisionTreeRegressor()
 }
 
 
 def score2ufloat(score):
     return u.ufloat(score.mean(), score.std())
 
-for name, clf in classifiers.iteritems():
-    print(name)
-    for num in NUMS:
-        y = df['coupon{}Used'.format(num)].values
-        score = score2ufloat(cross_val_score(clf, X, y, n_jobs=-1))
-        print(" {}: ({:P}) %".format(num, score * 100))
+for name, l in learners.iteritems():
+    score = cross_val_score(l, X, Y, n_jobs=-1)
+    print("{}: {:P}".format(name, score2ufloat(score)))
