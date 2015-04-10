@@ -58,8 +58,11 @@ df['priceSum'] = df['price1'] + df['price2'] + df['price3']
 
 # Brands
 
-for b in ['brand1', 'brand2', 'brand3']:
-   df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
+brand_cols = ['brand1', 'brand2', 'brand3']
+brands = set(df[brand_cols].values.flatten())
+for b in brand_cols:
+    df[b].astype('category').cat.set_categories(brands)
+    df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
 
 #
 # Control plots
