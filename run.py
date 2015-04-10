@@ -60,7 +60,6 @@ df['priceSum'] = df['price1'] + df['price2'] + df['price3']
 
 for b in ['brand1', 'brand2', 'brand3']:
    df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
-   print(df)
 
 #
 # Control plots
@@ -161,7 +160,7 @@ for name, learner in learners.iteritems():
     plt.xlabel("log10(estimated basketValue)")
     plt.ylabel("log10(true basketValue)")
     plt.colorbar()
-    plt.savefig('plot.pdf')
-
+    plt.savefig('plot_{}.pdf'.format(name))
+    plt.clf()
 
     print("{}: {:P}".format(name, score2ufloat(score)))
