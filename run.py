@@ -57,18 +57,10 @@ df['sameDay'] = df.orderTime.dt.dayofyear == df.couponsReceived.dt.dayofyear
 df['priceSum'] = df['price1'] + df['price2'] + df['price3']
 
 # Brands
-brands = reduce(
-    lambda acc, x: acc.union(set(df['brand{}'.format(x)])),
-    (1, 2, 3),
-    set()
-)
-for num, brand in it.product(NUMS, brands):
-    df['brand{}_{}'.format(num, brand)] = 0
-for index, row in df.iterrows():
-    df.loc[index, 'brand1_{}'.format(row.brand1)] = 1
-    df.loc[index, 'brand2_{}'.format(row.brand2)] = 1
-    df.loc[index, 'brand3_{}'.format(row.brand3)] = 1
 
+for b in ['brand1', 'brand2', 'brand3']:
+   df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
+   print(df)
 
 #
 # Control plots
@@ -169,7 +161,7 @@ for name, learner in learners.iteritems():
     plt.xlabel("log10(estimated basketValue)")
     plt.ylabel("log10(true basketValue)")
     plt.colorbar()
-    plt.show()
+    plt.savefig('plot.pdf')
 
 
     print("{}: {:P}".format(name, score2ufloat(score)))
