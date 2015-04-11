@@ -12,6 +12,8 @@ import sklearn as skl
 import uncertainties as u
 import uncertainties.unumpy as unp
 
+from numpy.core.defchararray import count
+
 from sklearn.cross_validation import (
     cross_val_score,
     train_test_split,
@@ -41,6 +43,7 @@ df = pd.read_csv('data/train.txt', delimiter='|')
 for num in NUMS:
     df['logPrice{}'.format(num)] = np.log(df['price{}'.format(num)])
     df['logBasePrice{}'.format(num)] = np.log(df['basePrice{}'.format(num)])
+
 # Datetime
 df.orderTime = pd.to_datetime(df.orderTime)
 df.couponsReceived = pd.to_datetime(df.couponsReceived)
@@ -56,12 +59,28 @@ df['sameDay'] = df.orderTime.dt.dayofyear == df.couponsReceived.dt.dayofyear
 df['priceSum'] = df['price1'] + df['price2'] + df['price3']
 
 # Brands
-
 brand_cols = ['brand1', 'brand2', 'brand3']
 brands = set(df[brand_cols].values.flatten())
 for b in brand_cols:
     df[b].astype('category').cat.set_categories(brands)
     df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
+
+# Categorys
+
+categoriesString = ",".join(
+    np.hstack([
+        df.categoryIDs1,
+        df.categoryIDs2,
+        df.categoryIDs3,
+    ])
+)
+
+categories = set(categoriesString.split(","))
+for num in NUMS:
+    for i, cat in enumerate(categories):
+        category_strings = df["categoryIDs{}".format(num)].values.astype(str)
+        category_found = count(category_strings, cat) > 0
+        df["product{}_cat{}".format(num, i)] = category_found
 
 #
 # Control plots
@@ -127,8 +146,15 @@ columns = [
     'sameDay',
     'priceSum',
 ]
+
 # columns.extend([b for b in df.columns
 #                 if 'brand' in b and b not in ('brand1', 'brand2', 'brand3')])
+
+# columns.extend([cat for cat in df.columns
+#                 if 'cat' in cat and cat not in ("categoryIDs1",
+#                                                 "categoryIDs2",
+#                                                 "categoryIDs3")])
+
 labels = [
     'coupon1Used',
     'coupon2Used',
