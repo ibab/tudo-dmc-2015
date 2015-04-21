@@ -65,10 +65,20 @@ columns = [
     'premiumProduct3',
     'orderTime_minutes',
     'orderTime_weekday',
+    'periodicOrderTime_minutes',
+    'periodicOrderTime_weekday',
     'couponsReceived_minutes',
     'couponsReceived_weekday',
+    'periodicCouponsReceived_minutes',
+    'periodicCouponsReceived_weekday',
+    'premiumProduct1',
+    'premiumProduct2',
+    'premiumProduct3',
     'sameDay',
     'priceSum',
+    'reward1',
+    'reward2',
+    'reward3',
 ]
 
 # columns.extend([b for b in df.columns
