@@ -18,9 +18,16 @@ import sklearn as skl
 from sklearn.cross_validation import (
     cross_val_score,
     train_test_split,
+    KFold,
 )
 from sklearn.ensemble import (
-    RandomForestRegressor
+    RandomForestRegressor,
+    RandomForestClassifier,
+)
+
+from sklearn.svm import (
+    SVC,
+    SVR,
 )
 from sklearn.tree import DecisionTreeRegressor
 
@@ -29,10 +36,13 @@ def score2ufloat(score):
     return u.ufloat(score.mean(), score.std())
 
 
-def prudsys_score(estimator, X, y):
+def prudsys_score_xval(estimator, X, y):
     prediction = estimator.predict(X)
-    score = np.sum(((prediction - y)/np.mean(y, axis=0))**2)
+    score = np.sum(((prediction - y)/np.mean(y, axis=0))**2)/len(y)
+    return score
 
+def prudsys_score(prediction, truth):
+    score = np.sum(((prediction - truth)/np.mean(truth, axis=0))**2)/len(truth)
     return score
 
 
@@ -69,40 +79,56 @@ columns = [
 #                                                 "categoryIDs2",
 #                                                 "categoryIDs3")])
 
-labels = [
+labelnames_classification = [
     'coupon1Used',
     'coupon2Used',
     'coupon3Used',
+]
+
+labelnames_regression = [
     'basketValue',
 ]
 
 features = df[columns].values
-labels = df[labels].values
-learners = {
-    'Random Forest': RandomForestRegressor(
-        n_estimators=250,
-        n_jobs=-1,
-        max_features="auto",
-    ),
-    'Decision Tree': DecisionTreeRegressor()
-}
+labels_classification = df[labelnames_classification].values
+labels_regression = df[labelnames_regression].values
+
+classifier = RandomForestClassifier(
+    n_estimators=200,
+    n_jobs=-1,
+)
+
+# regressor = RandomForestRegressor(
+#     n_estimators=200,
+#     n_jobs=-1,
+# )
+
+regressor = SVR()
 
 
+scores = []
+
+kfv = KFold(features.shape[0], n_folds=10, shuffle=True)
+for i, (train, test) in enumerate(kfv):
+
+    print('cross val run {}'.format(i+1))
+
+    # predict the couponsXUsed variables:
+    classifier.fit(features[train], labels_classification[train])
+    coupon_pred = classifier.predict(features[test])
+
+    print('Mean coupon1Used pred:', coupon_pred[:,0].mean())
+    print('Mean coupon1Used truth:', labels_classification[test][:,0].mean())
 
 
-x_train, x_test, y_train, y_test = train_test_split(features, labels, test_size=0.33)
-for name, learner in learners.iteritems():
-    score = cross_val_score(learner, features, labels, scoring=prudsys_score, n_jobs=-1)
+    regressor.fit(features[train], labels_regression[train].ravel())
+    basket_pred = regressor.predict(features[test])
 
-    learner.fit(x_train, y_train)
-    rek_basket = learner.predict(x_test)
+    prediction = np.column_stack([coupon_pred, basket_pred])
+    truth = np.column_stack([labels_classification[test],
+                             labels_regression[test],
+                             ])
 
-    plt.hist2d(np.log10(rek_basket[:,3]), np.log10(y_test[:,3]), 100, cmap="hot")
-    plt.xlabel("log10(estimated basketValue)")
-    plt.ylabel("log10(true basketValue)")
-    plt.colorbar()
-    plt.savefig('plot_{}.pdf'.format(name))
-    plt.clf()
+    scores.append(prudsys_score(prediction, truth))
 
-    result = score2ufloat(score)
-    print("{}: {:1.5f}+/-{:1.5f}".format(name, result.n, result.s))
+print(u'Score: {:3.3f} ± {:3.3f}'.format(np.mean(scores), np.std(scores)))
