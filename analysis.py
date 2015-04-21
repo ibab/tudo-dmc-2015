@@ -12,7 +12,6 @@ import pandas as pd
 import uncertainties as u
 import uncertainties.unumpy as unp
 
-from numpy.core.defchararray import count
 import sklearn as skl
 from sklearn.cross_validation import (
     cross_val_score,
@@ -103,4 +102,5 @@ for name, learner in learners.iteritems():
     plt.savefig('plot_{}.pdf'.format(name))
     plt.clf()
 
-    print("{}: {:P}".format(name, score2ufloat(score)))
+    result = score2ufloat(score)
+    print("{}: {:1.5f}+/-{:1.5f}".format(name, result.n, result.s))
