@@ -29,6 +29,11 @@ def feature_generation(df, brands=None, categories=None):
     if categories is not None:
         df = add_categories(df, categories)
 
+    df = add_periodical_transform(df, 'orderTime_weekday', 7)
+    df = add_periodical_transform(df, 'orderTime_minutes', 1440)
+    df = add_periodical_transform(df, 'couponsReceived_weekday', 7)
+    df = add_periodical_transform(df, 'couponsReceived_minutes', 1440)
+
     for num in NUMS:
         df = add_log10(df, 'price{}'.format(num))
         df = add_log10(df, 'basePrice{}'.format(num))
@@ -50,6 +55,7 @@ def add_brands(df, brands):
         df = df.join(pd.get_dummies(df[b], b, dummy_na=True))
 
     return df
+
 
 def get_all_brands(df1, df2):
     """
@@ -118,6 +124,15 @@ def get_all_categories(df1, df2):
     categories = set(categoriesString.split(","))
 
     return categories
+
+
+def add_periodical_transform(df, feature, period):
+    df = df.copy()
+
+    transform = np.sin(df[feature] * 2 * np.pi/period)
+    df['periodic' + feature[0].capitalize() + feature[1:]] = transform
+
+    return df
 
 
 if __name__ == '__main__':
