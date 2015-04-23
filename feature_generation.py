@@ -137,10 +137,55 @@ def add_periodical_transform(df, feature, period):
     return df
 
 
+def add_user_mean_excluding_current_row(df, feature, nan=np.nan):
+    df = df.copy()
+    values = np.zeros_like(df.index).astype(float)
+
+    for i in range(len(df.index)):
+        userID = df.userID.loc[i]
+        orderID = df.orderID.loc[i]
+
+        query = df[np.logical_and(df.userID == userID, df.orderID != orderID)]
+
+        if len(query) > 0:
+            values[i] = np.mean(query[feature])
+        else:
+            values[i] = nan
+
+    df['mean' + feature[0].capitalize() + feature[1:]] = values
+
+    return df
+
+
+def add_user_mean_from_other_df(df1, df2, feature, nan=np.nan):
+
+    df1 = df1.copy()
+    users = set(df1.userID)
+    means = np.zeros_like(df1.index).astype(float)
+
+    for i, user in enumerate(users):
+        query = df2[df2.userID == user]
+        if len(query) > 0:
+            user_mean = np.mean(query[feature])
+        else:
+            user_mean = nan
+
+        means[df1.userID == user] = user_mean
+
+
+    df1['mean' + feature[0].capitalize() + feature[1:]] = means
+    return df1
+
+
+
+
 if __name__ == '__main__':
 
     train = pd.read_csv('data/train.txt', delimiter='|')
     classify = pd.read_csv('data/class.txt', delimiter='|')
+
+    # train.userID = train.userID.astype(str)
+    # classify.userID = classify.userID.astype(str)
 
     n_before = len(train.columns)
 
@@ -149,6 +194,17 @@ if __name__ == '__main__':
 
     train = feature_generation(train, brands, categories)
     classify = feature_generation(classify, brands, categories)
+
+    train = add_user_mean_excluding_current_row(train, 'coupon1Used')
+    train = add_user_mean_excluding_current_row(train, 'coupon2Used')
+    train = add_user_mean_excluding_current_row(train, 'coupon3Used')
+    train = add_user_mean_excluding_current_row(train, 'basketValue')
+
+    classify = add_user_mean_from_other_df(classify, train, 'coupon1Used')
+    classify = add_user_mean_from_other_df(classify, train, 'coupon2Used')
+    classify = add_user_mean_from_other_df(classify, train, 'coupon3Used')
+    classify = add_user_mean_from_other_df(classify, train, 'basketValue')
+
 
     print('created {} new feautes'.format(len(train.columns) - n_before))
 
