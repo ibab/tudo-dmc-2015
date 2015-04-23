@@ -88,7 +88,7 @@ def add_timing(df):
 
     df.orderTime = pd.to_datetime(df.orderTime)
     df.couponsReceived = pd.to_datetime(df.couponsReceived)
-    df['deltaT'] = (df.orderTime - df.couponsReceived).astype('int64')
+    df['deltaT'] = (df.orderTime - df.couponsReceived).astype('int64')/1e9/60
     df['orderTime_weekday'] = df.orderTime.dt.dayofweek
     df['couponsReceived_weekday'] = df.couponsReceived.dt.dayofweek
     df['orderTime_minutes'] = df.orderTime.dt.hour * 60 + df.orderTime.dt.minute
@@ -137,7 +137,7 @@ def add_periodical_transform(df, feature, period):
     return df
 
 
-def add_user_mean_excluding_current_row(df, feature, nan=np.nan):
+def add_user_func_exc_cur_row(df, func, label, feature, nan=np.nan):
     df = df.copy()
     values = np.zeros_like(df.index).astype(float)
 
@@ -148,16 +148,16 @@ def add_user_mean_excluding_current_row(df, feature, nan=np.nan):
         query = df[np.logical_and(df.userID == userID, df.orderID != orderID)]
 
         if len(query) > 0:
-            values[i] = np.mean(query[feature])
+            values[i] = func(query[feature])
         else:
             values[i] = nan
 
-    df['mean' + feature[0].capitalize() + feature[1:]] = values
+    df[label + feature[0].capitalize() + feature[1:]] = values
 
     return df
 
 
-def add_user_mean_from_other_df(df1, df2, feature, nan=np.nan):
+def add_user_func_from_other_df(df1, df2, func, label, feature, nan=np.nan):
 
     df1 = df1.copy()
     users = set(df1.userID)
@@ -166,17 +166,15 @@ def add_user_mean_from_other_df(df1, df2, feature, nan=np.nan):
     for i, user in enumerate(users):
         query = df2[df2.userID == user]
         if len(query) > 0:
-            user_mean = np.mean(query[feature])
+            user_mean = func(query[feature])
         else:
             user_mean = nan
 
-        means[df1.userID == user] = user_mean
+        means[df1.userID.values == user] = user_mean
 
 
-    df1['mean' + feature[0].capitalize() + feature[1:]] = means
+    df1[label + feature[0].capitalize() + feature[1:]] = means
     return df1
-
-
 
 
 if __name__ == '__main__':
@@ -195,15 +193,19 @@ if __name__ == '__main__':
     train = feature_generation(train, brands, categories)
     classify = feature_generation(classify, brands, categories)
 
-    train = add_user_mean_excluding_current_row(train, 'coupon1Used')
-    train = add_user_mean_excluding_current_row(train, 'coupon2Used')
-    train = add_user_mean_excluding_current_row(train, 'coupon3Used')
-    train = add_user_mean_excluding_current_row(train, 'basketValue')
+    train['numCouponsUsed'] = train.coupon1Used + train.coupon2Used + train.coupon3Used
 
-    classify = add_user_mean_from_other_df(classify, train, 'coupon1Used')
-    classify = add_user_mean_from_other_df(classify, train, 'coupon2Used')
-    classify = add_user_mean_from_other_df(classify, train, 'coupon3Used')
-    classify = add_user_mean_from_other_df(classify, train, 'basketValue')
+    for feature in ['coupon1Used',
+                    'coupon2Used',
+                    'coupon3Used',
+                    'numCouponsUsed',
+                    'basketValue',
+                    ]:
+        for func in [np.mean, np.std, np.min, np.max]:
+
+            train = add_user_func_exc_cur_row(train, func, func.__name__, feature, -1e3)
+            classify = add_user_func_from_other_df(classify, train, func, func.__name__, feature, -1e3)
+
 
 
     print('created {} new feautes'.format(len(train.columns) - n_before))
