@@ -104,7 +104,7 @@ labels_classification = df[labelnames_classification].values
 labels_regression = df[labelnames_regression].values
 
 classifier = RandomForestClassifier(
-    n_estimators=200,
+    n_estimators=500,
     n_jobs=-1,
 )
 
@@ -115,7 +115,6 @@ classifier = RandomForestClassifier(
 
 regressor = SVR()
 
-
 scores = []
 
 kfv = KFold(features.shape[0], n_folds=10, shuffle=True)
@@ -125,11 +124,12 @@ for i, (train, test) in enumerate(kfv):
 
     # predict the couponsXUsed variables:
     classifier.fit(features[train], labels_classification[train])
-    coupon_pred = classifier.predict(features[test])
+    # predict_proba returns a list of 2xN matrices.
+    # For each one, m[:,1] gives the probability for couponUsed
+    coupon_pred = np.vstack(list(map(lambda x: x[:,1], classifier.predict_proba(features[test])))).T
 
-    print('Mean coupon1Used pred:', coupon_pred[:,0].mean())
-    print('Mean coupon1Used truth:', labels_classification[test][:,0].mean())
-
+    print('Mean coupon1Used pred:', coupon_pred[:,1].mean())
+    print('Mean coupon1Used truth:', labels_classification[test][:,1].mean())
 
     regressor.fit(features[train], labels_regression[train].ravel())
     basket_pred = regressor.predict(features[test])
@@ -139,6 +139,15 @@ for i, (train, test) in enumerate(kfv):
                              labels_regression[test],
                              ])
 
+    print('Error from classification: {:3.5f}'.format(
+        prudsys_score(prediction[:,:3], truth[:,:3])
+    ))
+    print('Error from regression: {:3.5f}'.format(
+        prudsys_score(prediction[:,3:], truth[:,3:])
+    ))
+    print('Total error: {:3.5f}'.format(prudsys_score(prediction, truth)))
+
     scores.append(prudsys_score(prediction, truth))
 
-print(u'Score: {:3.3f} ± {:3.3f}'.format(np.mean(scores), np.std(scores)))
+print(u'Score: {:3.5f} ± {:3.3f}'.format(np.mean(scores), np.std(scores)))
+
