@@ -79,7 +79,7 @@ def load_data(path):
 
     return X, y
 
-def estimate_xgb(X_train, X_test, y_train, seed=0):
+def estimate_xgb(X_train, y_train, X_test, seed=0):
     scaler = StandardScaler()
     scaler.fit(X_train)
     X_train = scaler.transform(X_train)
@@ -105,13 +105,13 @@ def estimate_xgb(X_train, X_test, y_train, seed=0):
 
     return np.array(probs).T
 
-def estimate_xgb_20(X_train, X_test, y_train):
+def estimate_xgb_20(X_train, y_train, X_test):
     proba = np.zeros((X_test.shape[0], y_train.shape[1]))
     for i in range(20):
-        proba += estimate_xgb(X_train, X_test, y_train, seed=i)
+        proba += estimate_xgb(X_train, y_train, X_test, seed=i)
     return proba / 20
 
-def estimate_mean(X_train, X_test, y_train):
+def estimate_mean(X_train, y_train, X_test):
     """
     Just return the mean of this feature in the train set
     """
@@ -120,7 +120,7 @@ def estimate_mean(X_train, X_test, y_train):
         ret.append(np.ones(X_test.shape[0]) * y_train[:,i].mean())
     return np.array(ret).T
 
-def estimate_nnet(X_train, X_test, y_train):
+def estimate_nnet(X_train, y_train, X_test):
     from keras.models import Sequential
     from keras.layers.core import Dense, Dropout, Activation
     from keras.layers.normalization import BatchNormalization
@@ -132,23 +132,23 @@ def estimate_nnet(X_train, X_test, y_train):
 
     dims = X_train.shape[1]
 
-    N = 32
+    N = 64
 
     model = Sequential()
     model.add(Dense(dims, N, init='glorot_uniform'))
     model.add(PReLU((N,)))
     model.add(BatchNormalization((N,)))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.3))
 
     model.add(Dense(N, N/2, init='glorot_uniform'))
     model.add(PReLU((N/2,)))
     model.add(BatchNormalization((N/2,)))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.3))
 
     model.add(Activation('softmax'))
     model.add(Dense(N/2, nb_classes, init='glorot_uniform'))
 
-    adam = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8, kappa=1-1e-8)
+    adam = Adam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-8, kappa=1-1e-8)
     print('Compiling...')
     model.compile(loss='mse', optimizer=adam)
     print('Fitting...')
@@ -156,7 +156,7 @@ def estimate_nnet(X_train, X_test, y_train):
     return model.predict_proba(X_test, verbose=0)
 
 def calc_score(estimator, X, y, train, test):
-    proba = estimator(X[train], X[test], y[train])
+    proba = estimator(X[train], y[train], X[test])
     each = np.mean((proba - y[test])**2, axis=0) / y[test].mean(axis=0)**2
     return each.mean()
 
@@ -176,16 +176,16 @@ estimators = [
 ]
 
 if __name__ == '__main__':
-    print("=== PREPROCESSING")
+    print("=== PREPROC ==")
     X, y = load_data('data/train.txt')
 
-    print('=== RUNNING')
+    print('=== RUNNING ===')
     results = []
     for name, est in estimators:
         est = mem.cache(est)
         results.append((name, perform_crossval(est, X, y)))
 
-    print('=== SCORES')
+    print('=== SCORES ===')
     for n, s in results:
         print(n, '\t', np.mean(s))
 
