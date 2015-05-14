@@ -79,7 +79,7 @@ def load_data(path):
 
     return X, y
 
-def estimate_xgb(X_train, X_test, y_train, y_test, seed=0):
+def estimate_xgb(X_train, X_test, y_train, seed=0):
     scaler = StandardScaler()
     scaler.fit(X_train)
     X_train = scaler.transform(X_train)
@@ -98,30 +98,65 @@ def estimate_xgb(X_train, X_test, y_train, y_test, seed=0):
     # Classify coupons one by one
     probs = []
     for i in [0, 1, 2]:
-        proba = np.zeros(y_test.shape[0])
+        proba = np.zeros(X_test.shape[0])
         clf.fit(X_train, y_train[:,i])
         proba = clf.predict_proba(X_test)[:,1]
         probs.append(proba)
 
     return np.array(probs).T
 
-def estimate_xgb_20(X_train, X_test, y_train, y_test):
-    proba = np.zeros(y_test.shape)
+def estimate_xgb_20(X_train, X_test, y_train):
+    proba = np.zeros((X_test.shape[0], y_train.shape[1]))
     for i in range(20):
-        proba += estimate_xgb(X_train, X_test, y_train, y_test, seed=i)
+        proba += estimate_xgb(X_train, X_test, y_train, seed=i)
     return proba / 20
 
-def estimate_mean(X_train, X_test, y_train, y_test):
+def estimate_mean(X_train, X_test, y_train):
     """
     Just return the mean of this feature in the train set
     """
     ret = []
     for i in [0, 1, 2]:
-        ret.append(np.ones(y_test.shape[0]) * y_train[:,i].mean())
+        ret.append(np.ones(X_test.shape[0]) * y_train[:,i].mean())
     return np.array(ret).T
 
+def estimate_nnet(X_train, X_test, y_train):
+    from keras.models import Sequential
+    from keras.layers.core import Dense, Dropout, Activation
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.advanced_activations import PReLU
+    from keras.utils import np_utils, generic_utils
+    from keras.optimizers import SGD, Adam
+
+    nb_classes = y_train.shape[1]
+
+    dims = X_train.shape[1]
+
+    N = 32
+
+    model = Sequential()
+    model.add(Dense(dims, N, init='glorot_uniform'))
+    model.add(PReLU((N,)))
+    model.add(BatchNormalization((N,)))
+    model.add(Dropout(0.5))
+
+    model.add(Dense(N, N/2, init='glorot_uniform'))
+    model.add(PReLU((N/2,)))
+    model.add(BatchNormalization((N/2,)))
+    model.add(Dropout(0.5))
+
+    model.add(Activation('softmax'))
+    model.add(Dense(N/2, nb_classes, init='glorot_uniform'))
+
+    adam = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8, kappa=1-1e-8)
+    print('Compiling...')
+    model.compile(loss='mse', optimizer=adam)
+    print('Fitting...')
+    model.fit(X_train, y_train, verbose=0)
+    return model.predict_proba(X_test, verbose=0)
+
 def calc_score(estimator, X, y, train, test):
-    proba = estimator(X[train], X[test], y[train], y[test])
+    proba = estimator(X[train], X[test], y[train])
     each = np.mean((proba - y[test])**2, axis=0) / y[test].mean(axis=0)**2
     return each.mean()
 
@@ -136,6 +171,7 @@ def perform_crossval(estimator, X, y):
 estimators = [
         ('XGBoost single', estimate_xgb    ),
         ('XGBoost 20x',    estimate_xgb_20 ),
+        ('Das Netz',       estimate_nnet   ),
         ('Just the mean',  estimate_mean   ),
 ]
 
