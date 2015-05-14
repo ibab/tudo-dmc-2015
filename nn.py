@@ -51,7 +51,10 @@ def load_data(path):
     meanResp = data.groupby('couponID1').mean()
 
     for i, r in data.iterrows():
-        r['meanCouponResponse1'] = meanResp['coupon1Used'].loc[r.couponID1]
+        print(i)
+        used = data[r.orderID != data.orderID].groupby('couponID1').mean()['coupon1Used']
+        if r.couponID1 in used.index:
+            r['meanCouponResponse1'] = used.loc[r.couponID1]
 
     variables = ['orderTime',
                  'couponsReceived',
@@ -129,23 +132,18 @@ print(dims, 'dims')
 
 print("Building model...")
 
-N = 256
+N = 200
 
 model = Sequential()
 model.add(Dense(dims, N, init='glorot_uniform'))
 model.add(PReLU((N,)))
 model.add(BatchNormalization((N,)))
-model.add(Dropout(0.5))
+model.add(Dropout(0.6))
 
 model.add(Dense(N, N, init='glorot_uniform'))
 model.add(PReLU((N,)))
 model.add(BatchNormalization((N,)))
-model.add(Dropout(0.5))
-
-model.add(Dense(N, N, init='glorot_uniform'))
-model.add(PReLU((N,)))
-model.add(BatchNormalization((N,)))
-model.add(Dropout(0.5))
+model.add(Dropout(0.6))
 
 model.add(Activation('softmax'))
 model.add(Dense(N, nb_classes, init='glorot_uniform'))
@@ -157,9 +155,11 @@ model.compile(loss='mse', optimizer="adam")
 
 print("Training model...")
 
-model.fit(X, y, nb_epoch=500, batch_size=1024, validation_split=0.10)
+results = []
+model.fit(X, y, nb_epoch=500, batch_size=1024, validation_split=0.20)
+results.append(model.predict(X))
 
-print(model.predict(X))
+print(np.mean(results, axis=0))
 
 #print("Generating submission...")
 #
