@@ -15,8 +15,7 @@ from sklearn.decomposition import PCA
 
 np.random.seed(1337) # for reproducibility
 
-variables = ['orderID',
-             'orderTime',
+variables = ['orderTime',
              'couponsReceived',
              'deltaT',
              'reward1',
@@ -53,7 +52,8 @@ def load_data(path):
     df = pd.read_csv(path, delimiter='|')
     data = df.copy()
     # Remove outliers
-    data = data.query('basketValue < 30000').copy()
+    if len(data.query('basketValue < 30000')) > 0:
+        data = data.query('basketValue < 30000').copy()
 
     data.orderTime = pd.to_datetime(data.orderTime).astype('int64')/1e9/60
     data.couponsReceived = pd.to_datetime(data.couponsReceived).astype('int64')/1e9/60
@@ -172,7 +172,7 @@ def estimate_ffm(X_train, y_train, X_test, seed=0):
     results.append(np.zeros(X_test.shape[0]))
     return np.array(results).T
 
-def estimate_xgb(X_train, y_train, X_test, seed=0):
+def estimate_xgb(X_train, y_train, X_test, seed=0, threads=2):
     X_train, X_test = default_prep(X_train, X_test)
 
     basket_y = y_train[:,3]
@@ -190,7 +190,7 @@ def estimate_xgb(X_train, y_train, X_test, seed=0):
                 'eta': 0.32,
                 'subsample': 0.80,
                 'gamma': 11,
-                'nthreads': 2,
+                'nthreads': threads,
                 'verbose': 1,
                 'random_state': seed+150
             },
@@ -200,7 +200,7 @@ def estimate_xgb(X_train, y_train, X_test, seed=0):
                 'eta': 0.30,
                 'subsample': 0.80,
                 'gamma': 11,
-                'nthreads': 2,
+                'nthreads': threads,
                 'verbose': 1,
                 'random_state': seed+150
             },
@@ -210,7 +210,7 @@ def estimate_xgb(X_train, y_train, X_test, seed=0):
                 'eta': 0.30,
                 'subsample': 0.80,
                 'gamma': 11,
-                'nthreads': 2,
+                'nthreads': threads,
                 'verbose': 1,
                 'random_state': seed+150
             },
@@ -235,7 +235,7 @@ def estimate_xgb(X_train, y_train, X_test, seed=0):
         #'subsample': 0.94,
         'colsample': 1.00,
         #'gamma': 0.1,
-        'nthreads': 2,
+        'nthreads': threads,
         'verbose': 1,
         'random_state': seed+200
     }
@@ -252,15 +252,17 @@ def estimate_xgb(X_train, y_train, X_test, seed=0):
     #clf = GradientBoostingRegressor(n_estimators=200, learning_rate=0.05, max_depth=3, random_state=0, loss='huber')
     clf.fit(X_train, np.log(basket_y))
     basket_pred = np.exp(clf.predict(X_test))
+    print(basket_pred)
+    print(np.mean(basket_pred))
     #probs.append(np.ones(X_test.shape[0]) * basket_y.mean())
     probs.append(basket_pred)
 
     return np.array(probs).T
 
-def estimate_xgb_20(X_train, y_train, X_test):
+def estimate_xgb_20(X_train, y_train, X_test, threads=2):
     proba = np.zeros((X_test.shape[0], y_train.shape[1]))
     for i in range(20):
-        proba += estimate_xgb(X_train, y_train, X_test, seed=i+40)
+        proba += estimate_xgb(X_train, y_train, X_test, seed=i+40, threads=threads)
     return proba / 20
 
 def estimate_ffm_20(X_train, y_train, X_test):
@@ -351,8 +353,8 @@ def calc_score(estimator, X_train, X_test, y_train, y_test):
 
 def perform_crossval(estimator, X, y):
     from sklearn.cross_validation import KFold
-    skf = KFold(n=y.shape[0], n_folds=10)
-    results = Parallel(n_jobs=10)(
+    skf = KFold(n=y.shape[0], n_folds=2)
+    results = Parallel(n_jobs=2)(
             delayed(calc_score)(estimator, X[train], X[test], y[train], y[test]) for train, test in skf
     )
     return results
@@ -390,14 +392,14 @@ if __name__ == '__main__':
     #        break
 
     #df = pd.read_csv('data/class.txt', delimiter='|')
-    #y_pred = est(X, y, X_classify)
+    #y_pred = est(X, y, X_classify, threads=20)
 
     #df['coupon1Used'] = y_pred[:,0]
     #df['coupon2Used'] = y_pred[:,1]
     #df['coupon3Used'] = y_pred[:,2]
     #df['basketValue'] = y_pred[:,3]
 
-    #df = df[['orderID', 'coupon1Used', 'coupon2Used', 'coupon3Used']]
+    #df = df[['orderID', 'coupon1Used', 'coupon2Used', 'coupon3Used', 'basketValue']]
 
     #df.to_csv('TU_Dortmund_1.txt', sep='|', index=False)
 
