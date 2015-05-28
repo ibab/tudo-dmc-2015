@@ -261,21 +261,21 @@ if __name__ == '__main__':
         c1, c2, c3, reg = np.mean(s, axis=0)
         print(n, '\t', c1, '\t', c2, '\t', c3, '\t', c1+c2+c3, '\t', reg, '\t', c1+c2+c3+reg)
 
-    #for est in estimators:
-    #    if est[0] == 'XGBoost 20x':
-    #        est = est[1]
-    #        break
+    for est in estimators:
+        if est[0] == 'XGBoost 20x':
+            est = est[1]
+            break
 
-    #df = pd.read_csv('data/class.txt', delimiter='|')
-    #y_pred = est(X, y, X_classify, threads=20)
+    df = pd.read_csv('data/class.txt', delimiter='|')
+    y_pred = est(X, y, X_classify, threads=20)
 
-    #df['coupon1Used'] = y_pred[:,0]
-    #df['coupon2Used'] = y_pred[:,1]
-    #df['coupon3Used'] = y_pred[:,2]
-    #df['basketValue'] = y_pred[:,3]
+    df['coupon1Prediction'] = y_pred[:,0]
+    df['coupon2Prediction'] = y_pred[:,1]
+    df['coupon3Prediction'] = y_pred[:,2]
+    df['basketValuePrediction'] = y_pred[:,3]
 
-    #df = df[['orderID', 'coupon1Used', 'coupon2Used', 'coupon3Used', 'basketValue']]
+    df = df[['orderID', 'coupon1Prediction', 'coupon2Prediction', 'coupon3Prediction', 'basketValuePrediction']]
 
-    #df.to_csv('TU_Dortmund_1.txt', sep='|', index=False)
+    df.to_csv('TU_Dortmund_1.txt', sep='|', index=False)
 
 
