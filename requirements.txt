@@ -1,0 +1,3 @@
+pandas
+sklearn
+git+https://github.com/yandex/rep
