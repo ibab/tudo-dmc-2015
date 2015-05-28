@@ -122,56 +122,6 @@ def default_prep(X_train, X_test):
 
     return X_train, X_test
 
-def estimate_ffm(X_train, y_train, X_test, seed=0):
-    from tempfile import mkstemp
-    from sh import ffm_train, ffm_predict, echo
-
-    X_train, X_test = default_prep(X_train, X_test)
-
-    np.random.seed(seed)
-    Q = np.hstack([X_train, y_train])
-    np.random.shuffle(Q)
-    X_train = Q[:,:-4]
-    y_train = Q[:,-4:]
-
-    results = []
-
-    for i in [1,2,3]:
-        X = X_train[:,len(variables):]
-        y = y_train[:,i-1]
-        _, fname = mkstemp(suffix='.txt')
-        with open(fname, 'w') as f:
-            for xx, yy in zip(X, y):
-                f.write(str(yy) + ' ')
-                for k, x in enumerate(xx):
-                    f.write('{}:{}:1 '.format(k, int(x)))
-                f.write('\n')
-
-        mod = fname + '.model'
-        log = ffm_train(['-l', '0.008',
-                         '-k', '9',
-                         '-t', '30',
-                         '-r', '0.27',
-                         fname,
-                         mod,
-                        ], _out='/dev/null')
-
-        _, val = mkstemp('.validate.txt')
-        with open(val, 'w') as f:
-            for xx in X_test[:,len(variables):]:
-                f.write('1 ')
-                for k, x in enumerate(xx):
-                    f.write('{}:{}:1 '.format(k, int(x)))
-                f.write('\n')
-
-        _, out = mkstemp('.out.txt')
-        ffm_predict([val, mod, out], _out='/dev/null')
-        proba = np.loadtxt(out) * np.mean(y_train[:,i-1]) * 3.87
-        results.append(proba)
-
-    results.append(np.zeros(X_test.shape[0]))
-    return np.array(results).T
-
 def estimate_xgb(X_train, y_train, X_test, seed=0, threads=2):
     X_train, X_test = default_prep(X_train, X_test)
 
@@ -265,26 +215,6 @@ def estimate_xgb_20(X_train, y_train, X_test, threads=2):
         proba += estimate_xgb(X_train, y_train, X_test, seed=i+40, threads=threads)
     return proba / 20
 
-def estimate_ffm_20(X_train, y_train, X_test):
-    proba = np.zeros((X_test.shape[0], y_train.shape[1]))
-    for i in range(20):
-        proba += estimate_ffm(X_train, y_train, X_test, seed=i)
-    return proba / 20
-
-def estimate_rf(X_train, y_train, X_test):
-    from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
-    basket_y = y_train[:,3]
-    y_train = y_train[:,:3]
-
-    probas = []
-    for i in [0, 1, 2]:
-        clf = RandomForestClassifier(n_estimators=20, max_depth=4)
-        clf_ = BaggingClassifier(clf, max_samples=0.7, max_features=0.7)
-        clf_.fit(X_train, y_train[:,i])
-        probas.append(clf_.predict_proba(X_test)[:,1])
-    probas.append(np.ones(X_test.shape[0]) * basket_y.mean())
-    return np.array(probas).T
-
 def estimate_mean(X_train, y_train, X_test):
     """
     Just return the mean of this feature in the train set
@@ -293,57 +223,6 @@ def estimate_mean(X_train, y_train, X_test):
     for i in [0, 1, 2, 3]:
         ret.append(np.ones(X_test.shape[0]) * y_train[:,i].mean())
     return np.array(ret).T
-
-def estimate_mix(X_train, y_train, X_test):
-    p1 = estimate_xgb_20(X_train, y_train, X_test)
-    p2 = estimate_nnet(X_train, y_train, X_test)
-    return (p1 + p2) / 2
-
-def estimate_nnet(X_train, y_train, X_test):
-    import theano.tensor as T
-    from keras.models import Sequential
-    from keras.layers.core import Dense, Dropout, Activation
-    from keras.layers.normalization import BatchNormalization
-    from keras.layers.advanced_activations import PReLU
-    from keras.utils import np_utils, generic_utils
-    from keras.optimizers import SGD, Adam
-
-    X_train, X_test = default_prep(X_train, X_test)
-
-    basket_y = y_train[:,3]
-    y_train = y_train[:,:3]
-
-    #nb_classes = y_train.shape[1]
-    nb_classes = 1
-    dims = X_train.shape[1]
-
-    N = 128
-
-    model = Sequential()
-    model.add(Dense(dims, N, init='glorot_uniform'))
-    model.add(PReLU((N,)))
-    model.add(BatchNormalization((N,)))
-    model.add(Dropout(0.5))
-
-    model.add(Dense(N, N/2, init='glorot_uniform'))
-    model.add(PReLU((N/2,)))
-    model.add(BatchNormalization((N/2,)))
-    model.add(Dropout(0.3))
-
-    #model.add(Activation('softmax'))
-    #model.add(Activation('linear'))
-    model.add(Dense(N/2, nb_classes, init='glorot_uniform'))
-
-    adam = Adam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-8, kappa=1-1e-8)
-    model.compile(loss='mse', optimizer=adam)
-    model.fit(X_train, basket_y, nb_epoch=300, verbose=0)
-
-    # TODO provide better estimate
-    #proba = model.predict_proba(X_test, verbose=0)
-    #ret = np.hstack([proba, np.ones((X_test.shape[0], 1)) * basket_y.mean()])
-    ret = np.hstack([np.ones((X_test.shape[0], 3)), model.predict(X_test, verbose=0)])
-
-    return ret
 
 def calc_score(estimator, X_train, X_test, y_train, y_test):
     proba = estimator(X_train.copy(), y_train.copy(), X_test.copy())
@@ -361,12 +240,8 @@ def perform_crossval(estimator, X, y):
 
 estimators = [
         ('Just the mean',  estimate_mean   ),
-        #('Das Netz',       estimate_nnet   ),
         ('XGBoost single', estimate_xgb    ),
-        #('XGBoost 20x',    estimate_xgb_20 ),
-        #('RandomForest',   estimate_rf     ),
-        #('Big mix',        estimate_mix    ),
-        #('FFM     ',       estimate_ffm    ),
+        ('XGBoost 20x',    estimate_xgb_20 ),
 ]
 
 if __name__ == '__main__':
